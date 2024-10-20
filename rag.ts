@@ -1,7 +1,7 @@
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { ChatOllama, OllamaEmbeddings } from "@langchain/ollama";
 import { Document } from "langchain/document";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { ChatPromptTemplate, PromptTemplate } from "@langchain/core/prompts";
 import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { pull } from "langchain/hub";
@@ -11,10 +11,10 @@ export class RagService {
   private store: MemoryVectorStore;
   private embedding: OllamaEmbeddings;
 
-  constructor() {
+  constructor(model: string = "mistral") {
     // define the llm model
     this.llm = new ChatOllama({
-      model: "mistral:latest",
+      model,
       temperature: 0,
       maxRetries: 2,
     });
@@ -31,6 +31,14 @@ export class RagService {
 
   async chain() {
     const prompt = await pull<ChatPromptTemplate>("rlm/rag-prompt");
+
+    /* const prompt = ChatPromptTemplate.fromMessages([
+        ["system", "You are an assistant for question-answering tasks. Use only the retrieved information to answer the question"],
+        ["system", "Be concise in your replies and generate answer in paragraph form"],
+        ["system", "{context}"],
+        ["human", "{question}"],
+    ]); */
+
     return await createStuffDocumentsChain({
       prompt,
       llm: this.llm,
@@ -59,4 +67,16 @@ export class RagService {
 
     await this.store.addDocuments([doc]);
   }
+}
+
+if (import.meta.main) {
+  async function q(llm='mistral') {
+    const rag = new RagService(llm);
+    rag.add("Callisto is male persian cat who lives with Jason");
+    const response = await rag.get("what do you know so far?");
+    console.log(`\nAnswer: (${llm})\n ${response.trim()}\n`);
+  }
+
+  await q();
+  await q("phi3.5")
 }
